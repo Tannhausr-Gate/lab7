@@ -1,108 +1,52 @@
-# AgentCore Project
+# PiiLab: Ridgeline Moto service desk agent
 
-This project was created with the [AgentCore CLI](https://github.com/aws/agentcore-cli).
+An AgentCore agent for a motorcycle repair shop. Customers can check on a bike's
+service status and book a pickup with an outside transport service.
 
-## Project Structure
+## Setup
 
-```
-my-project/
-├── AGENTS.md               # AI coding assistant context
-├── agentcore/
-│   ├── agentcore.json      # Project config (agents, memories, credentials, gateways, evaluators)
-│   ├── aws-targets.json    # Deployment targets (account + region)
-│   ├── .env.local          # Secrets — API keys (gitignored)
-│   ├── .llm-context/       # TypeScript type definitions for AI assistants
-│   │   ├── agentcore.ts    # AgentCoreProjectSpec types
-│   │   └── aws-targets.ts  # Deployment target types
-│   └── cdk/                # CDK infrastructure (@aws/agentcore-cdk)
-├── app/                    # Agent application code
-└── evaluators/             # Custom evaluator code (if any)
-```
+    python -m venv .venv
+    source .venv/bin/activate        
+    Windows: source .venv/Scripts/activate
+    pip install -r requirements.txt
 
-## Getting Started
+## Tests
 
-### Prerequisites
 
-- **Node.js** 20.x or later
-- **Python 3.10+** and **uv** for Python agents ([install uv](https://docs.astral.sh/uv/getting-started/installation/))
-- **AWS credentials** configured (`aws configure` or environment variables)
-- **Docker** (only for Container build agents)
 
-### Development
+    pytest
 
-Run your agent locally:
+Tests replace Comprehend and the guardrail with local fakes, so they need no AWS
+credentials.
 
-```bash
-agentcore dev
-```
+## Run the agent
 
-### Validate Invocation Input
+Copy `.env.example` to `app/LabAgent/.env` and fill in:
 
-Validate runtime invocation payloads before forwarding them to an agent framework. Keep user prompts typed as strings
-and pass only prompt text to the agent.
+    AWS_REGION=
+    BEDROCK_MODEL_ID=
+    BEDROCK_MAX_TOKENS=
+    GUARDRAIL_ID=
+    GUARDRAIL_VERSION=
 
-### Deployment
+The AWS identity running the agent needs 
+1. `bedrock:InvokeModel`,
+2. `bedrock:ApplyGuardrail` 
+3. `comprehend:DetectPiiEntities`.
 
-Deploy to AWS:
+From the repo root:
 
-```bash
-agentcore deploy
-```
+    agentcore dev
 
-## Commands
+In a second terminal:
 
-| Command | Description |
-| --- | --- |
-| `agentcore create` | Create a new AgentCore project |
-| `agentcore add` | Add resources (agent, memory, credential, gateway, evaluator, policy) |
-| `agentcore remove` | Remove resources |
-| `agentcore dev` | Run agent locally with hot-reload |
-| `agentcore deploy` | Deploy to AWS via CDK |
-| `agentcore status` | Show deployment status |
-| `agentcore invoke` | Invoke agent (local or deployed) |
-| `agentcore logs` | View agent logs |
-| `agentcore traces` | View agent traces |
-| `agentcore eval` | Run evaluations |
-| `agentcore package` | Package agent artifacts |
-| `agentcore validate` | Validate configuration |
-| `agentcore pause` | Pause a deployed agent |
-| `agentcore resume` | Resume a paused agent |
-| `agentcore fetch` | Fetch remote resource definitions |
-| `agentcore import` | Import existing resources |
-| `agentcore update` | Check for CLI updates |
+    agentcore invoke --dev "What's the status on ticket RT-2207?"
 
-## Configuration
+## Output files
 
-Edit the JSON files in `agentcore/` to configure your project. See `agentcore/.llm-context/` for type definitions and validation constraints.
+- `logs/audit.jsonl`: audit log, redacted at write time
+- `outbox/transport.jsonl`: what the simulated transport service received
 
-The project uses a **flat resource model** — agents, memories, credentials, gateways, evaluators, and policies are top-level arrays in `agentcore.json`. Resources are independent; agents discover memories and credentials at runtime via environment variables or SDK calls.
+Both are gitignored. To check nothing leaked:
 
-## Resources
-
-| Resource | Purpose |
-| --- | --- |
-| Agent (runtime) | HTTP, MCP, or A2A agent deployed to AgentCore Runtime |
-| Memory | Persistent context storage with configurable strategies |
-| Credential | API key or OAuth credential providers |
-| Gateway | MCP gateway that routes tool calls to targets |
-| Gateway Target | Tool implementation (Lambda, MCP server, OpenAPI, Smithy, API Gateway) |
-| Evaluator | Custom LLM-as-a-Judge or code-based evaluation |
-| Online Eval Config | Continuous evaluation pipeline for deployed agents |
-| Policy | Cedar authorization policies for gateway tools |
-
-### Agent Types
-
-- **Template agents**: Created from framework templates (Strands, LangChain/LangGraph, GoogleADK, OpenAI Agents, Autogen)
-- **BYO agents**: Bring your own code with `agentcore add agent --type byo`
-- **Import agents**: Import existing Bedrock agents with `agentcore import`
-
-### Build Types
-
-- **CodeZip**: Python source packaged as a zip and deployed directly to AgentCore Runtime
-- **Container**: Docker image built via CodeBuild (ARM64), pushed to ECR, and deployed to AgentCore Runtime
-
-## Documentation
-
-- [AgentCore CLI](https://github.com/aws/agentcore-cli)
-- [AgentCore CDK Constructs](https://github.com/aws/agentcore-l3-cdk-constructs)
-- [Amazon Bedrock AgentCore](https://aws.amazon.com/bedrock/agentcore/)
+    grep -rn "alex.testrider@example.com" --include="*.jsonl" .
